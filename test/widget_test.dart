@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shoot_points/main.dart';
 import 'package:shoot_points/models/media_entry.dart';
+import 'package:shoot_points/config/feedback_config.dart';
 import 'package:shoot_points/state/entries_provider.dart';
+import 'package:shoot_points/state/feedback_prompt_provider.dart';
 import 'package:shoot_points/theme/app_theme.dart';
 import 'package:shoot_points/theme/theme_mode_controller.dart';
 import 'package:shoot_points/utils/format.dart';
@@ -26,6 +28,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
+    final feedbackProvider = await _loadFeedbackPromptProvider();
     await provider.load();
     await themeController.load();
 
@@ -33,6 +36,7 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider.value(value: feedbackProvider),
           ChangeNotifierProvider.value(value: themeController),
         ],
         child: const ShootPointsApp(),
@@ -57,6 +61,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
+    final feedbackProvider = await _loadFeedbackPromptProvider();
     await provider.load();
     await themeController.load();
 
@@ -64,6 +69,7 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider.value(value: feedbackProvider),
           ChangeNotifierProvider.value(value: themeController),
         ],
         child: const ShootPointsApp(),
@@ -83,8 +89,7 @@ void main() {
     );
     expect(disabledSubmit.onPressed, isNull);
     expect(
-      disabledSubmit.style!.backgroundColor!.resolve({WidgetState.disabled})!
-          .a,
+      disabledSubmit.style!.backgroundColor!.resolve({WidgetState.disabled})!.a,
       lessThan(1),
     );
 
@@ -112,16 +117,13 @@ void main() {
       ),
     );
     expect(readySubmit.onPressed, isNotNull);
-    expect(
-      readySubmit.style!.backgroundColor!.resolve({})!,
-      AppTheme.accent,
-    );
+    expect(readySubmit.style!.backgroundColor!.resolve({})!, AppTheme.accent);
     await tester.scrollUntilVisible(find.text('Submit'), 300);
     await tester.tap(find.text('Submit'));
     await tester.pumpAndSettle();
 
     expect(find.text('0.25'), findsNWidgets(2));
-    expect(find.text('Added 0.25 pts'), findsNothing);
+    expect(find.text('Added 0.25 pts'), findsOneWidget);
     expect(provider.todaysEntries.single.sqftRange, 'Up to 2,000');
     expect(
       provider.todaysEntries.single.label,
@@ -135,6 +137,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
+    final feedbackProvider = await _loadFeedbackPromptProvider();
     await provider.load();
     await themeController.load();
 
@@ -142,6 +145,7 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider.value(value: feedbackProvider),
           ChangeNotifierProvider.value(value: themeController),
         ],
         child: const ShootPointsApp(),
@@ -175,12 +179,176 @@ void main() {
     expect(preferences.getBool('point_tracker_dark_mode'), isTrue);
   });
 
+  testWidgets(
+    'New Homes Community Splat calculates points from decimal acres',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final provider = EntriesProvider();
+      final themeController = ThemeModeController();
+      final feedbackProvider = await _loadFeedbackPromptProvider();
+      await provider.load();
+      await themeController.load();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: provider),
+            ChangeNotifierProvider.value(value: feedbackProvider),
+            ChangeNotifierProvider.value(value: themeController),
+          ],
+          child: const ShootPointsApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+
+      final root = find.text('New Homes Community Splat');
+      await tester.ensureVisible(root);
+      await tester.tap(root);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '2.5');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Submit'));
+      await tester.pumpAndSettle();
+
+      expect(provider.todaysEntries.single.acres, '2.5');
+      expect(provider.todaysEntries.single.points, closeTo(0.0125, 0.0000001));
+      expect(
+        find.text('New Homes Community Splat\nAcres: 2.5'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('Residential Land Splat submits without qualifiers', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final provider = EntriesProvider();
+    final themeController = ThemeModeController();
+    final feedbackProvider = await _loadFeedbackPromptProvider();
+    await provider.load();
+    await themeController.load();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider.value(value: feedbackProvider),
+          ChangeNotifierProvider.value(value: themeController),
+        ],
+        child: const ShootPointsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+
+    final root = find.text('Residential Land Splat');
+    await tester.ensureVisible(root);
+    await tester.tap(root);
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('Submit'), findsOneWidget);
+
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+
+    expect(provider.todaysEntries.single.label, 'Residential Land Splat');
+    expect(provider.todaysEntries.single.points, 0.25);
+  });
+
+  testWidgets('review prompt waits until a successful Home submission', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'feedback_open_count': firstPromptAfterOpens,
+    });
+    final provider = EntriesProvider();
+    final themeController = ThemeModeController();
+    final feedbackProvider = await _loadFeedbackPromptProvider();
+    await provider.load();
+    await themeController.load();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider.value(value: feedbackProvider),
+          ChangeNotifierProvider.value(value: themeController),
+        ],
+        child: const ShootPointsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enjoying Point Tracker?'), findsNothing);
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    final root = find.text('Residential Land Splat');
+    await tester.ensureVisible(root);
+    await tester.tap(root);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Submit'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enjoying Point Tracker?'), findsOneWidget);
+    expect(find.text('Added 0.25 pts'), findsOneWidget);
+    await tester.tap(find.text('Maybe Later'));
+    await tester.pumpAndSettle();
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(
+      preferences.getInt('feedback_next_prompt_at'),
+      firstPromptAfterOpens + repeatPromptEveryOpens,
+    );
+  });
+
+  testWidgets('Feedback screen offers the two form options', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final provider = EntriesProvider();
+    final themeController = ThemeModeController();
+    final feedbackProvider = await _loadFeedbackPromptProvider();
+    await provider.load();
+    await themeController.load();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider.value(value: feedbackProvider),
+          ChangeNotifierProvider.value(value: themeController),
+        ],
+        child: const ShootPointsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Feedback'));
+    await tester.pumpAndSettle();
+
+    expect(find.text("We'd love to hear from you"), findsOneWidget);
+    expect(find.text('Leave a Review'), findsOneWidget);
+    expect(find.text('Make a Suggestion'), findsOneWidget);
+    expect(find.byType(ElevatedButton), findsNWidgets(2));
+  });
+
   testWidgets('identical entries show a count and delete removes one', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
+    final feedbackProvider = await _loadFeedbackPromptProvider();
     await provider.load();
     await themeController.load();
 
@@ -206,6 +374,7 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider.value(value: feedbackProvider),
           ChangeNotifierProvider.value(value: themeController),
         ],
         child: const ShootPointsApp(),
@@ -238,4 +407,10 @@ void main() {
     expect(find.text('0.01'), findsNWidgets(2));
     expect(provider.todaysTotal, closeTo(0.006666, 0.0000001));
   });
+}
+
+Future<FeedbackPromptProvider> _loadFeedbackPromptProvider() async {
+  final provider = FeedbackPromptProvider();
+  await provider.load();
+  return provider;
 }

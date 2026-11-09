@@ -79,7 +79,7 @@ class EntriesProvider extends ChangeNotifier {
       jsonEncode(entries.map((entry) => entry.toJson()).toList()),
     );
     if (!saved) {
-      throw StateError('Could not save shoot points entries.');
+      throw StateError('Could not save Point Tracker entries.');
     }
   }
 

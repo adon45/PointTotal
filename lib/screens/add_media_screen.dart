@@ -20,12 +20,17 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
   HomeSpecification? _specification;
   PointOption? _selectedRange;
   PointOption? _selectedItem;
+  final TextEditingController _acresController = TextEditingController();
   bool _saving = false;
 
   bool get _isReady {
     final root = _root;
     if (root == null) return false;
     if (root.isStandalone) return true;
+    if (root.label == 'New Homes Community Splat') {
+      final acres = _acresValue;
+      return acres != null && acres > 0;
+    }
     if (root.label == 'Homes') {
       return _level != null && _specification != null && _selectedRange != null;
     }
@@ -36,6 +41,10 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
     final root = _root;
     if (root == null) return null;
     if (root.isStandalone) return root.points;
+    if (root.label == 'New Homes Community Splat') {
+      final acres = _acresValue;
+      return acres == null ? null : acres * 0.005;
+    }
     if (root.label == 'Homes') return _selectedRange?.points;
     return _selectedItem?.points;
   }
@@ -43,16 +52,34 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
   String? get _sqftRange =>
       _root?.label == 'Homes' ? _selectedRange?.label : null;
 
+  String? get _acres {
+    if (_root?.label != 'New Homes Community Splat') return null;
+    final acres = _acresController.text.trim();
+    return acres.isEmpty ? null : acres;
+  }
+
+  double? get _acresValue {
+    final acres = double.tryParse(_acresController.text.trim());
+    return acres != null && acres.isFinite ? acres : null;
+  }
+
   String? get _entryLabel {
     final root = _root;
     if (root == null) return null;
     if (root.isStandalone) return root.label;
+    if (root.label == 'New Homes Community Splat') return root.label;
     if (root.label == 'Homes') {
       if (_level == null || _specification == null) return null;
       return 'Homes – $_level – ${_specification!.label}';
     }
     if (_selectedItem == null) return null;
     return '${root.label} – ${_selectedItem!.label}';
+  }
+
+  @override
+  void dispose() {
+    _acresController.dispose();
+    super.dispose();
   }
 
   @override
@@ -122,6 +149,24 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
   }
 
   List<Widget> _qualifiedFieldsFor(RootOption option) {
+    if (option.label == 'New Homes Community Splat') {
+      return [
+        _fieldLabel('Acres'),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: TextField(
+            controller: _acresController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              hintText: 'Enter number of acres',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+      ];
+    }
+
     if (option.label == 'Homes') {
       return [
         _fieldLabel('Level'),
@@ -221,6 +266,7 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
           _specification = null;
           _selectedRange = null;
           _selectedItem = null;
+          _acresController.clear();
           return;
         }
         _root = option;
@@ -228,6 +274,7 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
         _specification = null;
         _selectedRange = null;
         _selectedItem = null;
+        _acresController.clear();
       }),
     );
   }
@@ -317,9 +364,10 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
           points: points,
           timestamp: timestamp,
           sqftRange: _sqftRange,
+          acres: _acres,
         ),
       );
-      if (mounted) Navigator.of(context).pop(points);
+      if (mounted) Navigator.of(context).pop(true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

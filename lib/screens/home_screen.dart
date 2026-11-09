@@ -3,12 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config/feedback_config.dart';
 import '../models/media_entry.dart';
 import '../state/entries_provider.dart';
+import '../state/feedback_prompt_provider.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_mode_controller.dart';
 import '../utils/format.dart';
+import '../utils/open_link.dart';
 import 'add_media_screen.dart';
+import 'feedback_screen.dart';
 import 'history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -68,6 +72,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             onPressed: themeMode.toggle,
           ),
           IconButton(
+            tooltip: 'Feedback',
+            icon: const Icon(Icons.rate_review_outlined, color: Colors.white),
+            onPressed: () {
+              Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(builder: (_) => const FeedbackScreen()),
+              );
+            },
+          ),
+          IconButton(
             tooltip: 'History',
             icon: const Icon(Icons.history, color: Colors.white),
             onPressed: () {
@@ -94,13 +107,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.add, size: 28),
                       label: const Text('Add', style: TextStyle(fontSize: 20)),
-                      onPressed: () async {
-                        await Navigator.of(context).push<double>(
-                          MaterialPageRoute<double>(
-                            builder: (_) => const AddMediaScreen(),
-                          ),
-                        );
-                      },
+                      onPressed: _addMedia,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -140,7 +147,100 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     );
   }
+
+  Future<void> _addMedia() async {
+    final entriesProvider = context.read<EntriesProvider>();
+    final feedbackProvider = context.read<FeedbackPromptProvider>();
+    final previousIds = entriesProvider.todaysEntries
+        .map((entry) => entry.id)
+        .toSet();
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => const AddMediaScreen()),
+    );
+    if (!mounted || result != true) return;
+
+    final addedEntries = entriesProvider.todaysEntries
+        .where((entry) => !previousIds.contains(entry.id))
+        .toList();
+    if (addedEntries.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Added ${formatExactPoints(addedEntries.first.points)} pts',
+          ),
+        ),
+      );
+    }
+
+    if (feedbackProvider.shouldShowPrompt) {
+      await _showFeedbackPrompt(feedbackProvider);
+    }
+  }
+
+  Future<void> _showFeedbackPrompt(
+    FeedbackPromptProvider feedbackProvider,
+  ) async {
+    final action = await showDialog<_FeedbackPromptAction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Enjoying Point Tracker?'),
+        content: const Text(
+          'Would you take a moment to rate the app and tell us what you think?',
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () =>
+                Navigator.of(dialogContext)
+                    .pop(_FeedbackPromptAction.leaveReview),
+            child: const Text('Leave a Review'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext)
+                    .pop(_FeedbackPromptAction.maybeLater),
+            child: const Text('Maybe Later'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_FeedbackPromptAction.neverAsk),
+            child: const Text("Don't Ask Again"),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case _FeedbackPromptAction.maybeLater:
+        await feedbackProvider.markMaybeLater();
+        break;
+      case _FeedbackPromptAction.neverAsk:
+        await feedbackProvider.markNeverAsk();
+        break;
+      case _FeedbackPromptAction.leaveReview:
+        final opened = await openLink(reviewFormUrl);
+        if (!mounted) return;
+        if (opened) {
+          await feedbackProvider.markReviewed();
+        } else {
+          await feedbackProvider.markMaybeLater();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Couldn't open the form. Please try again."),
+            ),
+          );
+        }
+    }
+  }
 }
+
+enum _FeedbackPromptAction { leaveReview, maybeLater, neverAsk }
 
 class _TotalCard extends StatelessWidget {
   const _TotalCard({required this.total});
@@ -196,10 +296,16 @@ class _SubmittedTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final groupedEntries = <(String, String?, double), List<MediaEntry>>{};
+    final groupedEntries =
+        <(String, String?, String?, double), List<MediaEntry>>{};
     for (final entry in entries) {
       groupedEntries
-          .putIfAbsent((entry.label, entry.sqftRange, entry.points), () => [])
+          .putIfAbsent((
+            entry.label,
+            entry.sqftRange,
+            entry.acres,
+            entry.points,
+          ), () => [])
           .add(entry);
     }
     final groups = groupedEntries.values
@@ -212,8 +318,7 @@ class _SubmittedTable extends StatelessWidget {
       child: SingleChildScrollView(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final headerColor =
-                Theme.of(context).brightness == Brightness.dark
+            final headerColor = Theme.of(context).brightness == Brightness.dark
                 ? const Color(0xFF172A4D)
                 : AppTheme.primary;
             return SizedBox(
@@ -254,6 +359,8 @@ class _SubmittedTable extends StatelessWidget {
                               mediaEntry.label,
                               if (mediaEntry.sqftRange != null)
                                 'Sq Ft: ${mediaEntry.sqftRange}',
+                              if (mediaEntry.acres != null)
+                                'Acres: ${mediaEntry.acres}',
                               if (group.quantity > 1) '× ${group.quantity}',
                             ].join('\n'),
                             maxLines: 3,
@@ -338,7 +445,6 @@ class _SubmittedTable extends StatelessWidget {
       await context.read<EntriesProvider>().deleteEntry(id);
     }
   }
-
 }
 
 class _EntryGroup {

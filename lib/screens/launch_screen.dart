@@ -19,8 +19,8 @@ class LaunchScreen extends StatelessWidget {
                   const Spacer(),
                   Image.asset(
                     'assets/images/point_tracker_icon.png',
-                    width: 144,
-                    height: 144,
+                    width: 216,
+                    height: 216,
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) => Icon(
                       Icons.photo_camera_outlined,

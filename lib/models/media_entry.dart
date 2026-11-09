@@ -5,6 +5,7 @@ class MediaEntry {
     required this.points,
     required this.timestamp,
     this.sqftRange,
+    this.acres,
   });
 
   factory MediaEntry.create({
@@ -12,6 +13,7 @@ class MediaEntry {
     required double points,
     required DateTime timestamp,
     String? sqftRange,
+    String? acres,
   }) {
     return MediaEntry(
       id: '${timestamp.microsecondsSinceEpoch}-${_nextId++}',
@@ -19,6 +21,7 @@ class MediaEntry {
       points: points,
       timestamp: timestamp,
       sqftRange: sqftRange,
+      acres: acres,
     );
   }
 
@@ -27,6 +30,7 @@ class MediaEntry {
       id: json['id'] as String,
       label: json['label'] as String,
       sqftRange: json['sqftRange'] as String?,
+      acres: json['acres'] as String?,
       points: (json['points'] as num).toDouble(),
       timestamp: DateTime.parse(json['timestamp'] as String).toLocal(),
     );
@@ -37,6 +41,7 @@ class MediaEntry {
   final String id;
   final String label;
   final String? sqftRange;
+  final String? acres;
   final double points;
   final DateTime timestamp;
 
@@ -44,6 +49,7 @@ class MediaEntry {
     'id': id,
     'label': label,
     'sqftRange': sqftRange,
+    'acres': acres,
     'points': points,
     'timestamp': timestamp.toIso8601String(),
   };

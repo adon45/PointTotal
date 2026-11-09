@@ -32,6 +32,8 @@ const List<RootOption> rootOptions = [
   RootOption('Homes'),
   RootOption('Media Shoots'),
   RootOption('Neighborhood'),
+  RootOption('New Homes Community Splat'),
+  RootOption('Residential Land Splat', points: 0.25),
   RootOption('Leads', points: 0.0667),
   RootOption('Tenants', points: 0.006666),
   RootOption('SV', points: 0.0556),

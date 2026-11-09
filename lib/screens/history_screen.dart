@@ -96,6 +96,7 @@ class _HistoryEntryRow extends StatelessWidget {
                 Text(
                   [
                     if (entry.sqftRange != null) entry.sqftRange!,
+                    if (entry.acres != null) 'Acres: ${entry.acres}',
                     _time(entry.timestamp),
                   ].join(' • '),
                   style: Theme.of(context).textTheme.bodySmall,
