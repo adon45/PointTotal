@@ -45,6 +45,14 @@ class MediaEntry {
   final double points;
   final DateTime timestamp;
 
+  int get matterportBonusDollars {
+    if (!label.startsWith('Homes –')) return 0;
+    if (points == 0.25) return 30;
+    if (points == 0.50) return 60;
+    if (points == 0.75) return 90;
+    return 0;
+  }
+
   Map<String, Object?> toJson() => {
     'id': id,
     'label': label,

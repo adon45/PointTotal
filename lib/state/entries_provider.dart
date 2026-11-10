@@ -22,6 +22,11 @@ class EntriesProvider extends ChangeNotifier {
   double get todaysTotal =>
       todaysEntries.fold(0, (total, entry) => total + entry.points);
 
+  int get todaysMatterportBonus => todaysEntries.fold(
+    0,
+    (total, entry) => total + entry.matterportBonusDollars,
+  );
+
   Map<DateTime, List<MediaEntry>> get entriesByDay {
     final grouped = <DateTime, List<MediaEntry>>{};
     for (final entry in _entries) {

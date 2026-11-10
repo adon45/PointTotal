@@ -13,6 +13,7 @@ import '../utils/format.dart';
 import '../utils/open_link.dart';
 import 'add_media_screen.dart';
 import 'feedback_screen.dart';
+import 'guide_screen.dart';
 import 'history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -72,6 +73,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             onPressed: themeMode.toggle,
           ),
           IconButton(
+            tooltip: 'Quick Guide',
+            icon: const Icon(Icons.help_outline, color: Colors.white),
+            onPressed: () {
+              Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(builder: (_) => const GuideScreen()),
+              );
+            },
+          ),
+          IconButton(
             tooltip: 'Feedback',
             icon: const Icon(Icons.rate_review_outlined, color: Colors.white),
             onPressed: () {
@@ -100,7 +110,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _TotalCard(total: entries.todaysTotal),
+                  _TotalCard(
+                    total: entries.todaysTotal,
+                    matterportBonus: entries.todaysMatterportBonus,
+                  ),
                   const SizedBox(height: 14),
                   SizedBox(
                     height: 68,
@@ -243,13 +256,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 enum _FeedbackPromptAction { leaveReview, maybeLater, neverAsk }
 
 class _TotalCard extends StatelessWidget {
-  const _TotalCard({required this.total});
+  const _TotalCard({required this.total, required this.matterportBonus});
 
   final double total;
+  final int matterportBonus;
 
   @override
   Widget build(BuildContext context) {
-    final today = DateTime.now();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
       color: isDark ? const Color(0xFF172A4D) : AppTheme.primary,
@@ -279,7 +292,7 @@ class _TotalCard extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              _shortDate(today),
+              'Matterport Bonus: \$$matterportBonus',
               style: const TextStyle(color: Colors.white70, fontSize: 14),
             ),
           ],
@@ -458,22 +471,4 @@ class _EntryGroup {
 
   double get totalPoints =>
       entries.fold(0, (total, entry) => total + entry.points);
-}
-
-String _shortDate(DateTime date) {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return '${months[date.month - 1]} ${date.day}, ${date.year}';
 }

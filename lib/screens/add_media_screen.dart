@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../data/points_data.dart';
@@ -21,11 +22,15 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
   PointOption? _selectedRange;
   PointOption? _selectedItem;
   final TextEditingController _acresController = TextEditingController();
+  final TextEditingController _tenantsAddedController = TextEditingController();
+  final TextEditingController _tenantsRemovedController =
+      TextEditingController();
   bool _saving = false;
 
   bool get _isReady {
     final root = _root;
     if (root == null) return false;
+    if (root.label == 'Tenants') return true;
     if (root.isStandalone) return true;
     if (root.label == 'New Homes Community Splat') {
       final acres = _acresValue;
@@ -40,6 +45,11 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
   double? get _selectedPoints {
     final root = _root;
     if (root == null) return null;
+    if (root.label == 'Tenants') {
+      final tenantsAdded = int.tryParse(_tenantsAddedController.text) ?? 0;
+      final tenantsRemoved = int.tryParse(_tenantsRemovedController.text) ?? 0;
+      return (tenantsAdded + tenantsRemoved) * root.points!;
+    }
     if (root.isStandalone) return root.points;
     if (root.label == 'New Homes Community Splat') {
       final acres = _acresValue;
@@ -66,6 +76,11 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
   String? get _entryLabel {
     final root = _root;
     if (root == null) return null;
+    if (root.label == 'Tenants') {
+      final tenantsAdded = int.tryParse(_tenantsAddedController.text) ?? 0;
+      final tenantsRemoved = int.tryParse(_tenantsRemovedController.text) ?? 0;
+      return 'Tenants – Added: $tenantsAdded, Removed: $tenantsRemoved';
+    }
     if (root.isStandalone) return root.label;
     if (root.label == 'New Homes Community Splat') return root.label;
     if (root.label == 'Homes') {
@@ -79,6 +94,8 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
   @override
   void dispose() {
     _acresController.dispose();
+    _tenantsAddedController.dispose();
+    _tenantsRemovedController.dispose();
     super.dispose();
   }
 
@@ -149,6 +166,15 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
   }
 
   List<Widget> _qualifiedFieldsFor(RootOption option) {
+    if (option.label == 'Tenants') {
+      return [
+        _fieldLabel('Tenants Added'),
+        _integerField(_tenantsAddedController, 'Enter tenants added'),
+        _fieldLabel('Tenants Removed'),
+        _integerField(_tenantsRemovedController, 'Enter tenants removed'),
+      ];
+    }
+
     if (option.label == 'New Homes Community Splat') {
       return [
         _fieldLabel('Acres'),
@@ -226,6 +252,25 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
     return const [];
   }
 
+  Widget _integerField(TextEditingController controller, String hintText) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(3),
+        ],
+        decoration: InputDecoration(
+          hintText: hintText,
+          border: const OutlineInputBorder(),
+        ),
+        onChanged: (_) => setState(() {}),
+      ),
+    );
+  }
+
   Widget _qualifiedSection(RootOption option) {
     return _nestedSection(_qualifiedFieldsFor(option));
   }
@@ -267,6 +312,8 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
           _selectedRange = null;
           _selectedItem = null;
           _acresController.clear();
+          _tenantsAddedController.clear();
+          _tenantsRemovedController.clear();
           return;
         }
         _root = option;
@@ -275,6 +322,8 @@ class _AddMediaScreenState extends State<AddMediaScreen> {
         _selectedRange = null;
         _selectedItem = null;
         _acresController.clear();
+        _tenantsAddedController.clear();
+        _tenantsRemovedController.clear();
       }),
     );
   }

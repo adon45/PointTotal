@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shoot_points/main.dart';
 import 'package:shoot_points/models/media_entry.dart';
 import 'package:shoot_points/config/feedback_config.dart';
+import 'package:shoot_points/data/points_data.dart';
 import 'package:shoot_points/state/entries_provider.dart';
 import 'package:shoot_points/state/feedback_prompt_provider.dart';
 import 'package:shoot_points/theme/app_theme.dart';
@@ -12,6 +13,17 @@ import 'package:shoot_points/theme/theme_mode_controller.dart';
 import 'package:shoot_points/utils/format.dart';
 
 void main() {
+  test('Leads and Tenants use their configured point values', () {
+    expect(
+      rootOptions.firstWhere((option) => option.label == 'Leads').points,
+      0.067,
+    );
+    expect(
+      rootOptions.firstWhere((option) => option.label == 'Tenants').points,
+      0.007,
+    );
+  });
+
   test('point formatting preserves exact values and rounds totals only', () {
     expect(formatExactPoints(0.25), '0.25');
     expect(formatExactPoints(0.5), '0.50');
@@ -20,6 +32,34 @@ void main() {
     expect(formatExactPoints(0.006666), '0.006666');
     expect(formatExactPoints(0.0556), '0.0556');
     expect(formatTotal(0.0667 + 0.006666), '0.07');
+  });
+
+  test('Homes Matterport bonus follows the assignment point value', () {
+    final timestamp = DateTime.now();
+    expect(
+      MediaEntry.create(
+        label: 'Homes – Silver – Silver w/ Splat',
+        points: 0.25,
+        timestamp: timestamp,
+      ).matterportBonusDollars,
+      30,
+    );
+    expect(
+      MediaEntry.create(
+        label: 'Homes – Silver – Silver w/ Splat',
+        points: 0.50,
+        timestamp: timestamp,
+      ).matterportBonusDollars,
+      60,
+    );
+    expect(
+      MediaEntry.create(
+        label: 'Homes – Silver – Silver w/ Splat',
+        points: 0.75,
+        timestamp: timestamp,
+      ).matterportBonusDollars,
+      90,
+    );
   });
 
   testWidgets('home screen displays the daily total and empty state', (
@@ -53,6 +93,43 @@ void main() {
     expect(find.text('0.00'), findsOneWidget);
     expect(find.text('No media submitted yet'), findsOneWidget);
     expect(find.text('Created by Austin Donovan'), findsOneWidget);
+  });
+
+  testWidgets('Quick Guide opens from Home and shows guide topics', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final provider = EntriesProvider();
+    final themeController = ThemeModeController();
+    final feedbackProvider = await _loadFeedbackPromptProvider();
+    await provider.load();
+    await themeController.load();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider.value(value: feedbackProvider),
+          ChangeNotifierProvider.value(value: themeController),
+        ],
+        child: const ShootPointsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Quick Guide'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Quick Guide'), findsOneWidget);
+    expect(find.text('Your daily points'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('A quick example'), 250);
+    expect(find.text('A quick example'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Your data stays on this device'),
+      250,
+    );
+    expect(find.text('Your data stays on this device'), findsOneWidget);
   });
 
   testWidgets('Homes selection saves its exact points and range', (
@@ -129,7 +206,66 @@ void main() {
       provider.todaysEntries.single.label,
       'Homes – Silver – Silver w/ Splat',
     );
+    expect(provider.todaysMatterportBonus, 30);
+    expect(find.text('Matterport Bonus: \$30'), findsOneWidget);
   });
+
+  testWidgets(
+    'Tenants counts accept up to three digits and use tenant points',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final provider = EntriesProvider();
+      final themeController = ThemeModeController();
+      final feedbackProvider = await _loadFeedbackPromptProvider();
+      await provider.load();
+      await themeController.load();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: provider),
+            ChangeNotifierProvider.value(value: feedbackProvider),
+            ChangeNotifierProvider.value(value: themeController),
+          ],
+          child: const ShootPointsApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+
+      final root = find.text('Tenants');
+      await tester.ensureVisible(root);
+      await tester.tap(root);
+      await tester.pumpAndSettle();
+
+      final fields = find.byType(TextField);
+      expect(fields, findsNWidgets(2));
+      final blankSubmit = tester.widget<ElevatedButton>(
+        find.ancestor(
+          of: find.text('Submit'),
+          matching: find.byType(ElevatedButton),
+        ),
+      );
+      expect(blankSubmit.onPressed, isNotNull);
+      await tester.enterText(fields.at(0), '1500');
+      await tester.enterText(fields.at(1), '46');
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Submit'));
+      await tester.tap(find.text('Submit'));
+      await tester.pumpAndSettle();
+
+      expect(
+        provider.todaysEntries.single.label,
+        'Tenants – Added: 150, Removed: 46',
+      );
+      expect(provider.todaysEntries.single.points, closeTo(1.372, 0.0000001));
+      expect(provider.todaysTotal, closeTo(1.372, 0.0000001));
+    },
+  );
 
   testWidgets('goal total turns orange and dark mode preference persists', (
     tester,
