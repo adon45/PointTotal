@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shoot_points/main.dart';
 import 'package:shoot_points/models/media_entry.dart';
 import 'package:shoot_points/config/feedback_config.dart';
+import 'package:shoot_points/config/update_announcement_config.dart';
 import 'package:shoot_points/data/points_data.dart';
 import 'package:shoot_points/state/entries_provider.dart';
 import 'package:shoot_points/state/feedback_prompt_provider.dart';
@@ -65,7 +66,7 @@ void main() {
   testWidgets('home screen displays the daily total and empty state', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
+    _setMockInitialValues();
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
     final feedbackProvider = await _loadFeedbackPromptProvider();
@@ -95,10 +96,79 @@ void main() {
     expect(find.text('Created by Austin Donovan'), findsOneWidget);
   });
 
+  testWidgets('update announcement can be dismissed and is remembered', (
+    tester,
+  ) async {
+    _setMockInitialValues(announcementSeen: false);
+    final provider = EntriesProvider();
+    final themeController = ThemeModeController();
+    final feedbackProvider = await _loadFeedbackPromptProvider();
+    await provider.load();
+    await themeController.load();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider.value(value: feedbackProvider),
+          ChangeNotifierProvider.value(value: themeController),
+        ],
+        child: const ShootPointsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Heads up!'), findsOneWidget);
+    expect(find.textContaining('Go Gamecocks!'), findsOneWidget);
+    await tester.tap(find.text('Got It, Thanks Austin!'));
+    await tester.pumpAndSettle();
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(
+      preferences.getInt(updateAnnouncementPreferenceKey),
+      updateAnnouncementRevision,
+    );
+    expect(find.text('Heads up!'), findsNothing);
+  });
+
+  testWidgets('update announcement offers Leave a Review', (tester) async {
+    _setMockInitialValues(announcementSeen: false);
+    final provider = EntriesProvider();
+    final themeController = ThemeModeController();
+    final feedbackProvider = await _loadFeedbackPromptProvider();
+    await provider.load();
+    await themeController.load();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider.value(value: feedbackProvider),
+          ChangeNotifierProvider.value(value: themeController),
+        ],
+        child: const ShootPointsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Leave a Review'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Heads up!'), findsNothing);
+    final preferences = await SharedPreferences.getInstance();
+    expect(
+      preferences.getInt(updateAnnouncementPreferenceKey),
+      updateAnnouncementRevision,
+    );
+  });
+
   testWidgets('Quick Guide opens from Home and shows guide topics', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
+    _setMockInitialValues();
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
     final feedbackProvider = await _loadFeedbackPromptProvider();
@@ -135,7 +205,7 @@ void main() {
   testWidgets('Homes selection saves its exact points and range', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
+    _setMockInitialValues();
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
     final feedbackProvider = await _loadFeedbackPromptProvider();
@@ -213,7 +283,7 @@ void main() {
   testWidgets(
     'Tenants counts accept up to three digits and use tenant points',
     (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      _setMockInitialValues();
       final provider = EntriesProvider();
       final themeController = ThemeModeController();
       final feedbackProvider = await _loadFeedbackPromptProvider();
@@ -270,7 +340,7 @@ void main() {
   testWidgets('goal total turns orange and dark mode preference persists', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
+    _setMockInitialValues();
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
     final feedbackProvider = await _loadFeedbackPromptProvider();
@@ -318,7 +388,7 @@ void main() {
   testWidgets(
     'New Homes Community Splat calculates points from decimal acres',
     (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      _setMockInitialValues();
       final provider = EntriesProvider();
       final themeController = ThemeModeController();
       final feedbackProvider = await _loadFeedbackPromptProvider();
@@ -363,7 +433,7 @@ void main() {
   testWidgets('Residential Land Splat submits without qualifiers', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
+    _setMockInitialValues();
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
     final feedbackProvider = await _loadFeedbackPromptProvider();
@@ -403,9 +473,9 @@ void main() {
   testWidgets('review prompt waits until a successful Home submission', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({
-      'feedback_open_count': firstPromptAfterOpens,
-    });
+    _setMockInitialValues(
+      values: {'feedback_open_count': firstPromptAfterOpens},
+    );
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
     final feedbackProvider = await _loadFeedbackPromptProvider();
@@ -449,7 +519,7 @@ void main() {
   });
 
   testWidgets('Feedback screen offers the two form options', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    _setMockInitialValues();
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
     final feedbackProvider = await _loadFeedbackPromptProvider();
@@ -481,7 +551,7 @@ void main() {
   testWidgets('identical entries show a count and delete removes one', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
+    _setMockInitialValues();
     final provider = EntriesProvider();
     final themeController = ThemeModeController();
     final feedbackProvider = await _loadFeedbackPromptProvider();
@@ -549,4 +619,15 @@ Future<FeedbackPromptProvider> _loadFeedbackPromptProvider() async {
   final provider = FeedbackPromptProvider();
   await provider.load();
   return provider;
+}
+
+void _setMockInitialValues({
+  Map<String, Object> values = const {},
+  bool announcementSeen = true,
+}) {
+  SharedPreferences.setMockInitialValues({
+    if (announcementSeen)
+      updateAnnouncementPreferenceKey: updateAnnouncementRevision,
+    ...values,
+  });
 }

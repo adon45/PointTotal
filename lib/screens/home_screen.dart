@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/feedback_config.dart';
+import '../config/update_announcement_config.dart';
 import '../models/media_entry.dart';
 import '../state/entries_provider.dart';
 import '../state/feedback_prompt_provider.dart';
@@ -25,6 +28,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Timer? _dateTimer;
+  bool _announcementCheckStarted = false;
 
   @override
   void initState() {
@@ -34,6 +38,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       const Duration(minutes: 1),
       (_) => context.read<EntriesProvider>().refreshDate(),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_announcementCheckStarted) {
+        _announcementCheckStarted = true;
+        unawaited(_showUpdateAnnouncementIfNeeded());
+      }
+    });
   }
 
   @override
@@ -48,6 +58,101 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       context.read<EntriesProvider>().refreshDate();
     }
+  }
+
+  Future<void> _showUpdateAnnouncementIfNeeded() async {
+    SharedPreferences preferences;
+    try {
+      preferences = await SharedPreferences.getInstance();
+    } on PlatformException catch (error, stackTrace) {
+      _reportAnnouncementError(error, stackTrace);
+      return;
+    }
+
+    if (!mounted ||
+        preferences.getInt(updateAnnouncementPreferenceKey) ==
+            updateAnnouncementRevision) {
+      return;
+    }
+
+    final action = await showDialog<_UpdateAnnouncementAction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: const Text('Heads up!'),
+          content: const Text(updateAnnouncementMessage),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext)
+                      .pop(_UpdateAnnouncementAction.dismiss),
+              child: const Text('Got It, Thanks Austin!'),
+            ),
+            ElevatedButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext)
+                      .pop(_UpdateAnnouncementAction.leaveReview),
+              child: const Text('Leave a Review'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+
+    bool saved;
+    try {
+      saved = await preferences.setInt(
+        updateAnnouncementPreferenceKey,
+        updateAnnouncementRevision,
+      );
+    } on PlatformException catch (error, stackTrace) {
+      _reportAnnouncementError(error, stackTrace);
+      return;
+    }
+    if (!mounted) return;
+    if (!saved) {
+      _showAnnouncementError(
+        'Could not save the update notice. It may appear again next time.',
+      );
+      return;
+    }
+
+    if (action == _UpdateAnnouncementAction.leaveReview) {
+      final feedbackProvider = context.read<FeedbackPromptProvider>();
+      final opened = await openLink(reviewFormUrl);
+      if (!mounted) return;
+      if (opened) {
+        await feedbackProvider.markReviewed();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Couldn't open the form. Please try again."),
+          ),
+        );
+      }
+    }
+  }
+
+  void _reportAnnouncementError(Object error, StackTrace stackTrace) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'Point Tracker update announcement',
+      ),
+    );
+    _showAnnouncementError(
+      'Could not load the update notice. Please try again later.',
+    );
+  }
+
+  void _showAnnouncementError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -254,6 +359,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 }
 
 enum _FeedbackPromptAction { leaveReview, maybeLater, neverAsk }
+
+enum _UpdateAnnouncementAction { dismiss, leaveReview }
 
 class _TotalCard extends StatelessWidget {
   const _TotalCard({required this.total, required this.matterportBonus});
