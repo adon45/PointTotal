@@ -72,6 +72,7 @@ const List<GuideTopic> guideTopics = [
     title: 'Your data stays on this device',
     text:
         'Entries are saved in this browser on this device. Clearing browser data or switching devices or browsers loses them. '
-        'On iPhone, use Share > Add to Home Screen and open the app from that icon.',
+        'On iPhone, use Share > Add to Home Screen and open the app from that icon. '
+        'The app also counts anonymous visits to help improve it; no personal information or points data is collected.',
   ),
 ];

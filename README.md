@@ -8,6 +8,8 @@ Entries are stored in each user's own browser on that device. They are lost if s
 
 The Quick Guide screen is available from Home; its text lives in [lib/data/guide_content.dart](lib/data/guide_content.dart).
 
+Anonymous visit analytics use Cloudflare Web Analytics; the snippet lives at the bottom of web/index.html.
+
 The update announcement appears once per browser/device; increment `updateAnnouncementRevision` in [lib/config/update_announcement_config.dart](lib/config/update_announcement_config.dart) to show a new announcement.
 
 ## Feedback
